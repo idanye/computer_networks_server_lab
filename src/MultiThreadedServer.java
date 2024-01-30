@@ -35,7 +35,6 @@ public class MultiThreadedServer {
             while (true) {
                 try {
                     Socket clientSocket = serverSocket.accept();
-                    System.out.println("New client connected!\n");
 
                     // Using thread pool to handle client connections
                     threadPool.execute(new ClientHandler(clientSocket, rootDirectory, defaultPage));
@@ -67,6 +66,7 @@ class ClientHandler implements Runnable {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             OutputStream out = clientSocket.getOutputStream();
+            System.out.println("New client connected!\n");
 
             // Parsing the incoming request using HTTPRequest
             HTTPRequest request = new HTTPRequest(in);
