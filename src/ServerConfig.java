@@ -1,7 +1,7 @@
 import java.io.*;
 import java.util.*;
 import java.nio.file.Paths;
-import java.nio.file.Path;
+
 public class ServerConfig {
     private int port;
     private String rootDirectory;
@@ -27,16 +27,16 @@ public class ServerConfig {
     }
 
     private String resolveRootDirectory(String configRootPath) {
-        // Check if the path starts with "~" which indicates a path relative to the user's home directory
         if (configRootPath.startsWith("~")) {
             String homeDirectory = System.getProperty("user.home");
-            configRootPath = configRootPath.replaceFirst("~", homeDirectory);
+            // Ensure we add a separator between the home directory and the subsequent path
+            configRootPath = homeDirectory + File.separator + configRootPath.substring(1);
         }
 
-        // Ensure the path is correctly formed, especially for Windows
-        Path path = Paths.get(configRootPath).normalize();
-        return path.toString();
+        // Normalize the path to ensure it's correct for the current OS and remove redundant name elements
+        return Paths.get(configRootPath).normalize().toString();
     }
+
     public int getPort() { return port; }
     public String getRootDirectory() { return rootDirectory; }
     public String getDefaultPage() { return defaultPage; }
