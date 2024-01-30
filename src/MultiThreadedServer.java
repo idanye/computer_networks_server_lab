@@ -35,7 +35,6 @@ public class MultiThreadedServer {
             while (true) {
                 try {
                     Socket clientSocket = serverSocket.accept();
-
                     // Using thread pool to handle client connections
                     threadPool.execute(new ClientHandler(clientSocket, rootDirectory, defaultPage));
                 } catch (IOException ex) {
