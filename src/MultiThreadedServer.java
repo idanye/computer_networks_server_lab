@@ -1,3 +1,4 @@
+import java.awt.*;
 import java.io.*;
 import java.net.*;
 import java.net.Socket;
@@ -103,6 +104,7 @@ class ClientHandler implements Runnable {
 
     private void handleGetRequest(HTTPRequest request, OutputStream out) throws IOException {
         String homeDirectory = System.getProperty("user.home");
+        System.out.println("Current home directory: "+ homeDirectory);
         String correctedRootDirectory = rootDirectory.replaceFirst("^~", homeDirectory);
 
         String requestedFile = request.getRequestedPage().equals("/") ? defaultPage : request.getRequestedPage();
@@ -113,6 +115,12 @@ class ClientHandler implements Runnable {
         if (!Files.exists(filePath)) {
             System.out.println("File not found: " + filePath);
             sendErrorResponse(out, 404, "404 Not Found");
+            return;
+        }
+
+        // Handling favicon.ico request
+        if (requestedFile.equals("/favicon.ico")) {
+            serveFavicon(out, correctedRootDirectory);
             return;
         }
 
@@ -158,7 +166,6 @@ class ClientHandler implements Runnable {
         writer.println("Content-Length: " + Files.size(filePath));
         writer.println(); // No body is sent for HEAD request
     }
-
 
     private void handleTraceRequest(HTTPRequest request, OutputStream out) throws IOException {
         PrintWriter writer = new PrintWriter(out, true);
@@ -218,6 +225,16 @@ class ClientHandler implements Runnable {
             return fileName.substring(lastIndex + 1);
         }
         return "";
+    }
+
+    private void serveFavicon(OutputStream out, String correctedRootDirectory) throws IOException {
+        Path faviconPath = Paths.get(correctedRootDirectory, "favicon.ico");
+        if (Files.exists(faviconPath)) {
+            byte[] faviconContent = Files.readAllBytes(faviconPath);
+            sendSuccessResponse(out, "image/x-icon", faviconContent);
+        } else {
+            sendErrorResponse(out, 404, "Not Found");
+        }
     }
 }
 
