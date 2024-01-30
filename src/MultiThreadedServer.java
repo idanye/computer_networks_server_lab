@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.nio.file.*;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -26,7 +27,7 @@ public class MultiThreadedServer {
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Server is listening on port " + port);
-
+            System.out.println("rootDirectory: " + rootDirectory);
             // limiting the number of threads
             ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
 
@@ -60,41 +61,31 @@ class ClientHandler implements Runnable {
         this.rootDirectory = rootDir;
         this.defaultPage = defaultPg;
     }
-
     @Override
     public void run() {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             OutputStream out = clientSocket.getOutputStream();
 
-            String requestLine = in.readLine(); // Read the first line of the request
-
-            if (requestLine == null || !requestLine.contains("HTTP")) {
-                sendErrorResponse(out, 400, "Bad Request");
-                return;
-            }
-
-            // Create an instance of HTTPRequest to parse the incoming request
+            // Parsing the incoming request using HTTPRequest
             HTTPRequest request = new HTTPRequest(in);
 
-            String method = request.getType();
-            if (!method.equals("GET")) {
-                sendErrorResponse(out, 501, "Not Implemented");
-                return;
+            switch (request.getType()) {
+                case "GET":
+                    handleGetRequest(request, out);
+                    break;
+                case "POST":
+                    handlePostRequest(request, out);
+                    break;
+                case "HEAD":
+                    handleHeadRequest(request, out);
+                    break;
+                case "TRACE":
+                    handleTraceRequest(request, out); // Updated to pass HTTPRequest object
+                    break;
+                default:
+                    sendErrorResponse(out, 501, "Not Implemented");
             }
-
-            String requestedFile = request.getRequestedPage().equals("/") ? defaultPage : request.getRequestedPage();
-            Path filePath = Paths.get(rootDirectory, requestedFile);
-
-            if (!Files.exists(filePath)) {
-                sendErrorResponse(out, 404, "Not Found");
-                return;
-            }
-
-            String contentType = determineContentType(filePath);
-            byte[] fileContent = Files.readAllBytes(filePath);
-
-            sendSuccessResponse(out, contentType, fileContent);
         } catch (Exception e) {
             try {
                 sendErrorResponse(clientSocket.getOutputStream(), 500, "Internal Server Error");
@@ -109,6 +100,86 @@ class ClientHandler implements Runnable {
             }
         }
     }
+
+    private void handleGetRequest(HTTPRequest request, OutputStream out) throws IOException {
+        String homeDirectory = System.getProperty("user.home");
+        String correctedRootDirectory = rootDirectory.replaceFirst("^~", homeDirectory);
+
+        String requestedFile = request.getRequestedPage().equals("/") ? defaultPage : request.getRequestedPage();
+        Path filePath = Paths.get(correctedRootDirectory, requestedFile);
+
+        System.out.println("Attempting to access file: " + filePath);
+
+        if (!Files.exists(filePath)) {
+            System.out.println("File not found: " + filePath);
+            sendErrorResponse(out, 404, "404 Not Found");
+            return;
+        }
+
+        String contentType = determineContentType(filePath);
+        byte[] fileContent = Files.readAllBytes(filePath);
+        sendSuccessResponse(out, contentType, fileContent);
+    }
+
+
+    private void handlePostRequest(HTTPRequest request, OutputStream out) throws IOException {
+        // Use the parsed parameters from HTTPRequest
+        Map<String, String> postData = request.getParameters();
+
+        // For debugging: Print each parameter and its value
+        postData.forEach((key, value) -> System.out.println(key + ": " + value));
+
+        // Respond back to the client
+        // You can create a response based on the postData
+        String responseMessage = "Received POST Data: " + postData.toString();
+        sendSuccessResponse(out, "text/plain", responseMessage.getBytes());
+    }
+
+
+    private void handleHeadRequest(HTTPRequest request, OutputStream out) throws IOException {
+        String homeDirectory = System.getProperty("user.home");
+        String correctedRootDirectory = rootDirectory.replaceFirst("^~", homeDirectory);
+
+        String requestedFile = request.getRequestedPage().equals("/") ? defaultPage : request.getRequestedPage();
+        Path filePath = Paths.get(correctedRootDirectory, requestedFile);
+
+        System.out.println("Attempting to access file (HEAD request): " + filePath);
+
+        if (!Files.exists(filePath)) {
+            System.out.println("File not found (HEAD request): " + filePath); //debug information
+            sendErrorResponse(out, 404, "Not Found");
+            return;
+        }
+
+        String contentType = determineContentType(filePath);
+        PrintWriter writer = new PrintWriter(out, true);
+        writer.println("HTTP/1.1 200 OK");
+        writer.println("Content-Type: " + contentType);
+        writer.println("Content-Length: " + Files.size(filePath));
+        writer.println(); // No body is sent for HEAD request
+    }
+
+
+    private void handleTraceRequest(HTTPRequest request, OutputStream out) throws IOException {
+        PrintWriter writer = new PrintWriter(out, true);
+
+        // Start the response with a success status line
+        writer.println("HTTP/1.1 200 OK");
+
+        // Specify the content type of the response
+        writer.println("Content-Type: message/http");
+
+        // Echoing back the received request line
+        writer.println(request.getRequestedPage());
+
+        // Echoing back all the headers of the received request
+        for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
+            writer.println(header.getKey() + ": " + header.getValue());
+        }
+        // End of headers, followed by a blank line
+        writer.println();
+    }
+
 
     private void sendErrorResponse(OutputStream out, int statusCode, String statusMessage) throws IOException {
         PrintWriter writer = new PrintWriter(out, true);

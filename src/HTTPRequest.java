@@ -7,20 +7,17 @@ public class HTTPRequest {
     private String type; // GET, POST, etc.
     private String requestedPage; // /, /index.html, etc.
     private boolean isImage; // Whether the requested page is an image
-    private int contentLength; // Content-Length from the header
-    private String referer; // Referer header
-    private String userAgent; // User-Agent header
+    private Map<String, String> headers; // Stores headers
+    private String body; // Stores the body for POST requests
     private Map<String, String> parameters; // Holds parameters
 
-    // Constructor that takes the request header and parses various components
+    // Constructor
     public HTTPRequest(BufferedReader reader) throws IOException {
-        // Initialize variables
         this.type = "";
         this.requestedPage = "";
         this.isImage = false;
-        this.contentLength = 0;
-        this.referer = "";
-        this.userAgent = "";
+        this.headers = new HashMap<>();
+        this.body = "";
         this.parameters = new HashMap<>();
 
         // Read the first line to get the request type and path
@@ -33,6 +30,54 @@ public class HTTPRequest {
         while ((line = reader.readLine()) != null && !line.isEmpty()) {
             parseHeaderLine(line);
         }
+
+        // If POST, read the body
+        if ("POST".equalsIgnoreCase(this.type)) {
+            readBody(reader);
+        }
+    }
+
+    private void readBody(BufferedReader reader) throws IOException {
+        // Parse Content-Length safely
+        int contentLength = 0;
+        try {
+            contentLength = Integer.parseInt(headers.getOrDefault("Content-Length", "0"));
+        } catch (NumberFormatException e) {
+            // Handle error or set a default value
+        }
+
+        char[] buffer = new char[contentLength];
+        reader.read(buffer, 0, contentLength);
+        this.body = new String(buffer);
+
+        // Parse body
+        parseBody();
+    }
+    private void parseBody() {
+        // Implement parsing logic for different content types
+        String contentType = headers.get("Content-Type");
+        if ("application/x-www-form-urlencoded".equalsIgnoreCase(contentType)) {
+            parseUrlEncodedBody();
+        } else if (contentType != null && contentType.startsWith("multipart/form-data")) {
+            parseMultipartFormData();
+        }
+    }
+    private void parseUrlEncodedBody() {
+        // Parse URL-encoded body
+        String[] pairs = this.body.split("&");
+        for (String pair : pairs) {
+            String[] keyValue = pair.split("=");
+            if (keyValue.length == 2) {
+                this.parameters.put(keyValue[0], keyValue[1]); // Consider URL decoding
+            }
+        }
+    }
+
+    //not sure if we need it?
+    private void parseMultipartFormData() {
+        // Implement parsing for multipart/form-data
+        // This will require processing the body to extract files and parameters
+        // Handle file uploads and other form fields
     }
 
     private void parseRequestLine(String line) {
@@ -40,10 +85,25 @@ public class HTTPRequest {
         String[] parts = line.split(" ");
         if (parts.length >= 2) {
             this.type = parts[0];
-            this.requestedPage = parts[1];
+            // Split the requested page and query string
+            String[] pathAndQuery = parts[1].split("\\?");
+            this.requestedPage = pathAndQuery[0];
             // Check if the requested page is an image
             if (requestedPage.matches(".*\\.(jpg|bmp|gif)$")) {
                 this.isImage = true;
+            }
+            // Parse query string for GET requests
+            if ("GET".equalsIgnoreCase(this.type) && pathAndQuery.length > 1) {
+                parseQueryString(pathAndQuery[1]);
+            }
+        }
+    }
+    private void parseQueryString(String queryString) {
+        String[] pairs = queryString.split("&");
+        for (String pair : pairs) {
+            String[] keyValue = pair.split("=");
+            if (keyValue.length == 2) {
+                this.parameters.put(keyValue[0], keyValue[1]); // Consider URL decoding
             }
         }
     }
@@ -52,19 +112,12 @@ public class HTTPRequest {
         // Example Header-Line: "Referer: http://example.com/"
         String[] parts = line.split(": ");
         if (parts.length >= 2) {
-            switch (parts[0]) {
-                case "Content-Length":
-                    this.contentLength = Integer.parseInt(parts[1].trim());
-                    break;
-                case "Referer":
-                    this.referer = parts[1];
-                    break;
-                case "User-Agent":
-                    this.userAgent = parts[1];
-                    break;
-            }
+            // Store each header in the map
+            headers.put(parts[0].trim(), parts[1].trim());
         }
     }
+
+
 
     // Getters for all the properties
     public String getType() {
@@ -80,15 +133,22 @@ public class HTTPRequest {
     }
 
     public int getContentLength() {
-        return contentLength;
+        // Extract content length from headers and convert to integer
+        try {
+            return Integer.parseInt(headers.getOrDefault("Content-Length", "0"));
+        } catch (NumberFormatException e) {
+            return 0; // Return default value in case of parsing error
+        }
     }
 
     public String getReferer() {
-        return referer;
+        // Extract the referer from headers
+        return headers.getOrDefault("Referer", "");
     }
 
     public String getUserAgent() {
-        return userAgent;
+        // Extract the user agent from headers
+        return headers.getOrDefault("User-Agent", "");
     }
 
     public Map<String, String> getParameters() {
@@ -96,4 +156,7 @@ public class HTTPRequest {
     }
 
     // Add more functionality as needed
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
 }
