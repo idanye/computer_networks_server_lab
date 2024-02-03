@@ -1,4 +1,3 @@
-import java.awt.*;
 import java.io.*;
 import java.net.*;
 import java.net.Socket;
@@ -8,6 +7,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MultiThreadedServer {
     static ServerConfig serverConfig;
@@ -15,6 +15,9 @@ public class MultiThreadedServer {
     static int maxThreads;
     static String rootDirectory;
     static String defaultPage;
+
+    static AtomicInteger activeConnections = new AtomicInteger(0);
+
 
     // Static block for initialization
     static {
@@ -33,14 +36,21 @@ public class MultiThreadedServer {
             ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
 
             while (true) {
-                try {
-                    Socket clientSocket = serverSocket.accept();
-                    // Using thread pool to handle client connections
-                    threadPool.execute(new ClientHandler(clientSocket, rootDirectory, defaultPage));
-                } catch (IOException ex) {
-                    System.out.println("Server exception: " + ex.getMessage());
-                    ex.printStackTrace();
+                if (activeConnections.get() >= maxThreads) {
+                    System.out.println("Connection limit exceeded. Denying new connections.");
+                    // Optionally, you might want to sleep for a bit here to prevent a tight loop
+                    try {
+                        Thread.sleep(100); // Sleep for 100 milliseconds
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    continue;
                 }
+
+                Socket clientSocket = serverSocket.accept();
+                int clientId = activeConnections.incrementAndGet(); // Use this as a unique ID
+                System.out.println("Client connected. Current clients: " + activeConnections.get() + ". Client ID: " + clientId);
+                threadPool.execute(new ClientHandler(clientSocket, rootDirectory, defaultPage, clientId)); // Pass clientId to ClientHandler
             }
 
         } catch (IOException ex) {
@@ -54,18 +64,21 @@ class ClientHandler implements Runnable {
     private Socket clientSocket;
     private String rootDirectory;
     private String defaultPage;
+    private int clientId;
 
-    public ClientHandler(Socket socket, String rootDir, String defaultPg) {
+
+    public ClientHandler(Socket socket, String rootDir, String defaultPg, int clientId) {
         this.clientSocket = socket;
         this.rootDirectory = rootDir;
         this.defaultPage = defaultPg;
+        this.clientId = clientId;
     }
     @Override
     public void run() {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             OutputStream out = clientSocket.getOutputStream();
-            System.out.println("New client connected!\n");
+            System.out.println("Client ID " + clientId + " started interaction.");
 
             // Parsing the incoming request using HTTPRequest
             HTTPRequest request = new HTTPRequest(in);
@@ -87,16 +100,17 @@ class ClientHandler implements Runnable {
                     sendErrorResponse(out, 501, "Not Implemented");
             }
         } catch (Exception e) {
-            try {
-                sendErrorResponse(clientSocket.getOutputStream(), 500, "Internal Server Error");
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
+            System.out.println("Error handling client ID " + clientId + ": " + e.getMessage());
         } finally {
             try {
+                System.out.println("Client ID " + clientId + " completed interaction.");
                 clientSocket.close();
             } catch (IOException ex) {
-                ex.printStackTrace();
+                System.out.println("Error closing connection for client ID " + clientId + ": " + ex.getMessage());
+            }
+            finally{
+                int currentClients = MultiThreadedServer.activeConnections.decrementAndGet(); // Decrement the counter
+                System.out.println("Client ID " + clientId + " disconnected. Current clients: " + currentClients);
             }
         }
     }
@@ -110,8 +124,6 @@ class ClientHandler implements Runnable {
         Path filePath = Paths.get(correctedRootDirectory, requestedFile);
 
         System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
-        System.out.println("\r\n");
-
 
         if (!Files.exists(filePath)) {
             System.out.println("File not found: " + filePath);
@@ -132,10 +144,8 @@ class ClientHandler implements Runnable {
 
 
     private void handlePostRequest(HTTPRequest request, OutputStream out) throws IOException {
-
         System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
         System.out.println("Content-length: " + request.getContentLength());
-        System.out.println("\r\n");
         // Use the parsed parameters from HTTPRequest
         Map<String, String> postData = request.getParameters();
 
@@ -150,7 +160,6 @@ class ClientHandler implements Runnable {
 
     private void handleHeadRequest(HTTPRequest request, OutputStream out) throws IOException {
         System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
-        System.out.println("\r\n");
 
         String homeDirectory = System.getProperty("user.home");
         String correctedRootDirectory = rootDirectory.replaceFirst("^~", homeDirectory);
@@ -180,9 +189,6 @@ class ClientHandler implements Runnable {
         // Specify the content type of the response
         writer.print("Content-Type: message/http\r\n");
 
-        // A blank line to separate headers from the body
-        writer.print("\r\n");
-
         // Echoing back the received request line (assuming you reconstruct it or have it stored)
         writer.print("TRACE " + request.getRequestedPage() + " HTTP/1.1\r\n");
 
@@ -191,14 +197,8 @@ class ClientHandler implements Runnable {
             writer.print(header.getKey() + ": " + header.getValue() + "\r\n");
         }
 
-        // End of headers in the body, followed by a blank line
-        writer.print("\r\n");
-
         writer.flush();
     }
-
-
-
 
     private void sendErrorResponse(OutputStream out, int statusCode, String statusMessage) throws IOException {
         PrintWriter writer = new PrintWriter(out, true);
