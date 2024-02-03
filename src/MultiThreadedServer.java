@@ -103,13 +103,15 @@ class ClientHandler implements Runnable {
 
     private void handleGetRequest(HTTPRequest request, OutputStream out) throws IOException {
         String homeDirectory = System.getProperty("user.home");
-        System.out.println("Current home directory: "+ homeDirectory);
+        //System.out.println("Current home directory: "+ homeDirectory);
         String correctedRootDirectory = rootDirectory.replaceFirst("^~", homeDirectory);
 
         String requestedFile = request.getRequestedPage().equals("/") ? defaultPage : request.getRequestedPage();
         Path filePath = Paths.get(correctedRootDirectory, requestedFile);
 
-        System.out.println("Attempting to access file: " + filePath);
+        System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
+        System.out.println("\r\n");
+
 
         if (!Files.exists(filePath)) {
             System.out.println("File not found: " + filePath);
@@ -130,6 +132,10 @@ class ClientHandler implements Runnable {
 
 
     private void handlePostRequest(HTTPRequest request, OutputStream out) throws IOException {
+
+        System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
+        System.out.println("Content-length: " + request.getContentLength());
+        System.out.println("\r\n");
         // Use the parsed parameters from HTTPRequest
         Map<String, String> postData = request.getParameters();
 
@@ -137,24 +143,23 @@ class ClientHandler implements Runnable {
         postData.forEach((key, value) -> System.out.println(key + ": " + value));
 
         // Respond back to the client
-        // You can create a response based on the postData
         String responseMessage = "Received POST Data: " + postData.toString();
         sendSuccessResponse(out, "text/plain", responseMessage.getBytes());
     }
 
 
     private void handleHeadRequest(HTTPRequest request, OutputStream out) throws IOException {
+        System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
+        System.out.println("\r\n");
+
         String homeDirectory = System.getProperty("user.home");
         String correctedRootDirectory = rootDirectory.replaceFirst("^~", homeDirectory);
 
         String requestedFile = request.getRequestedPage().equals("/") ? defaultPage : request.getRequestedPage();
         Path filePath = Paths.get(correctedRootDirectory, requestedFile);
 
-        System.out.println("Attempting to access file (HEAD request): " + filePath);
-
         if (!Files.exists(filePath)) {
-            System.out.println("File not found (HEAD request): " + filePath); //debug information
-            sendErrorResponse(out, 404, "Not Found");
+            sendErrorResponse(out, 404, "404 Not Found");
             return;
         }
 
@@ -169,22 +174,30 @@ class ClientHandler implements Runnable {
     private void handleTraceRequest(HTTPRequest request, OutputStream out) throws IOException {
         PrintWriter writer = new PrintWriter(out, true);
 
-        // Start the response with a success status line
-        writer.println("HTTP/1.1 200 OK");
+        // Start the response with the status line
+        writer.print("HTTP/1.1 200 OK\r\n");
 
         // Specify the content type of the response
-        writer.println("Content-Type: message/http");
+        writer.print("Content-Type: message/http\r\n");
 
-        // Echoing back the received request line
-        writer.println(request.getRequestedPage());
+        // A blank line to separate headers from the body
+        writer.print("\r\n");
+
+        // Echoing back the received request line (assuming you reconstruct it or have it stored)
+        writer.print("TRACE " + request.getRequestedPage() + " HTTP/1.1\r\n");
 
         // Echoing back all the headers of the received request
         for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
-            writer.println(header.getKey() + ": " + header.getValue());
+            writer.print(header.getKey() + ": " + header.getValue() + "\r\n");
         }
-        // End of headers, followed by a blank line
-        writer.println();
+
+        // End of headers in the body, followed by a blank line
+        writer.print("\r\n");
+
+        writer.flush();
     }
+
+
 
 
     private void sendErrorResponse(OutputStream out, int statusCode, String statusMessage) throws IOException {
