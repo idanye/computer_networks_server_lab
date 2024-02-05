@@ -3,27 +3,28 @@ import java.util.*;
 import java.nio.file.Paths;
 
 public class ServerConfig {
+    public static ServerConfig instance;
+
     private int port;
     private String rootDirectory;
     private String defaultPage;
     private int maxThreads;
 
-    public ServerConfig(String configFilePath) {
-        try {
-            Properties prop = new Properties();
-            prop.load(new FileInputStream(configFilePath));
+    public static void init(String configFilePath) throws Exception{
+        instance = new ServerConfig(configFilePath);
+    } 
 
-            // Reading each property
-            port = Integer.parseInt(prop.getProperty("port"));
-            //rootDirectory = prop.getProperty("root");
-            rootDirectory = resolveRootDirectory(prop.getProperty("root"));
+    public ServerConfig(String configFilePath) throws Exception{
+        Properties prop = new Properties();
+        prop.load(new FileInputStream(configFilePath));
 
-            defaultPage = prop.getProperty("defaultPage");
-            maxThreads = Integer.parseInt(prop.getProperty("maxThreads"));
+        // Reading each property
+        port = Integer.parseInt(prop.getProperty("port"));
+        //rootDirectory = prop.getProperty("root");
+        rootDirectory = resolveRootDirectory(prop.getProperty("root"));
 
-        } catch (IOException ex) {
-            System.out.println("Error reading config file: " + ex.getMessage());
-        }
+        defaultPage = prop.getProperty("defaultPage");
+        maxThreads = Integer.parseInt(prop.getProperty("maxThreads"));
     }
 
     private String resolveRootDirectory(String configRootPath) {

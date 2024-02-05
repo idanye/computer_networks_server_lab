@@ -6,16 +6,14 @@ import java.util.Map;
 public class HTTPRequest {
     private String type; // GET, POST, etc.
     private String requestedPage; // /, /index.html, etc.
-    private boolean isImage; // Whether the requested page is an image
     private Map<String, String> headers; // Stores headers
     private String body; // Stores the body for POST requests
     private Map<String, String> parameters; // Holds parameters
 
     // Constructor
-    public HTTPRequest(BufferedReader reader) throws IOException {
+    public HTTPRequest(BufferedReader reader) throws IOException, BadRequestException {
         this.type = "";
         this.requestedPage = "";
-        this.isImage = false;
         this.headers = new HashMap<>();
         this.body = "";
         this.parameters = new HashMap<>();
@@ -32,9 +30,7 @@ public class HTTPRequest {
         }
 
         // If POST, read the body
-        if ("POST".equalsIgnoreCase(this.type)) {
-            readBody(reader);
-        }
+        readBody(reader);
     }
 
     private void readBody(BufferedReader reader) throws IOException {
@@ -80,41 +76,58 @@ public class HTTPRequest {
         // Handle file uploads and other form fields
     }
 
-    private void parseRequestLine(String line) {
+    private void parseRequestLine(String line) throws BadRequestException {
         // Example Request-Line: "GET /index.html HTTP/1.1"
         String[] parts = line.split(" ");
-        if (parts.length >= 2) {
-            this.type = parts[0];
-            // Split the requested page and query string
-            String[] pathAndQuery = parts[1].split("\\?");
-            this.requestedPage = pathAndQuery[0];
-            // Check if the requested page is an image
-            if (requestedPage.matches(".*\\.(jpg|bmp|gif)$")) {
-                this.isImage = true;
-            }
-            // Parse query string for GET requests
-            if ("GET".equalsIgnoreCase(this.type) && pathAndQuery.length > 1) {
-                parseQueryString(pathAndQuery[1]);
-            }
+
+        if (parts.length != 3) {
+            throw new BadRequestException();
         }
-    }
-    private void parseQueryString(String queryString) {
-        String[] pairs = queryString.split("&");
-        for (String pair : pairs) {
-            String[] keyValue = pair.split("=");
-            if (keyValue.length == 2) {
-                this.parameters.put(keyValue[0], keyValue[1]); // Consider URL decoding
-            }
+        
+        this.type = parts[0];
+        // Split the requested page and query string
+        String[] pathAndQuery = parts[1].split("\\?");
+        this.requestedPage = pathAndQuery[0];
+        if (!isLegalPageRequest(requestedPage)) {
+            throw new BadRequestException();
+        }
+        // Parse query string for GET requests
+        if ("GET".equalsIgnoreCase(this.type) && pathAndQuery.length > 1) {
+            parseQueryString(pathAndQuery[1]);
         }
     }
 
-    private void parseHeaderLine(String line) {
+    private boolean isLegalPageRequest(String path) {
+        String[] parts = path.split("[/\\\\]");
+        for (String part : parts) {
+            if (part == "..") {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void parseQueryString(String queryString) throws BadRequestException {
+        String[] pairs = queryString.split("&");
+        for (String pair : pairs) {
+            String[] keyValue = pair.split("=");
+            
+            if (keyValue.length != 2) {
+                throw new BadRequestException();
+            }
+
+            this.parameters.put(keyValue[0], keyValue[1]); // Consider URL decoding
+        }
+    }
+
+    private void parseHeaderLine(String line) throws BadRequestException {
         // Example Header-Line: "Referer: http://example.com/"
         String[] parts = line.split(": ");
-        if (parts.length >= 2) {
-            // Store each header in the map
-            headers.put(parts[0].trim(), parts[1].trim());
+        if (parts.length != 2) {
+            throw new BadRequestException();
         }
+        headers.put(parts[0].trim(), parts[1].trim());
     }
 
 
@@ -126,10 +139,6 @@ public class HTTPRequest {
 
     public String getRequestedPage() {
         return requestedPage;
-    }
-
-    public boolean isImage() {
-        return isImage;
     }
 
     public int getContentLength() {
