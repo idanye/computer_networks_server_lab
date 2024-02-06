@@ -4,13 +4,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class HTTPRequest {
-    private String type; // GET, POST, etc.
-    private String requestedPage; // /, /index.html, etc.
-    private Map<String, String> headers; // Stores headers
-    private String body; // Stores the body for POST requests
-    private Map<String, String> parameters; // Holds parameters
+    private String type; // GET, POST, HEAD, TRACE
+    private String requestedPage;
+    private Map<String, String> headers;
+    private String body;
+    private Map<String, String> parameters;
 
-    // Constructor
+    //Constructor
     public HTTPRequest(BufferedReader reader) throws IOException, BadRequestException {
         this.type = "";
         this.requestedPage = "";
@@ -18,28 +18,29 @@ public class HTTPRequest {
         this.body = "";
         this.parameters = new HashMap<>();
 
-        // Read the first line to get the request type and path
+        // read the first line to get the request type and path
         String line = reader.readLine();
-        if (line != null) {
-            parseRequestLine(line);
+        if (line == null) {
+            throw new BadRequestException();
         }
+        parseRequestLine(line);
 
-        // Continue reading headers
+
+        // read headers
         while ((line = reader.readLine()) != null && !line.isEmpty()) {
             parseHeaderLine(line);
         }
 
-        // If POST, read the body
         readBody(reader);
     }
 
     private void readBody(BufferedReader reader) throws IOException {
-        // Parse Content-Length safely
+        // Parse Content-Length
         int contentLength = 0;
         try {
             contentLength = Integer.parseInt(headers.getOrDefault("Content-Length", "0"));
         } catch (NumberFormatException e) {
-            // Handle error or set a default value
+
         }
 
         char[] buffer = new char[contentLength];
@@ -64,7 +65,7 @@ public class HTTPRequest {
         for (String pair : pairs) {
             String[] keyValue = pair.split("=");
             if (keyValue.length == 2) {
-                this.parameters.put(keyValue[0], keyValue[1]); // Consider URL decoding
+                this.parameters.put(keyValue[0], keyValue[1]);
             }
         }
     }
@@ -136,17 +137,15 @@ public class HTTPRequest {
     public String getType() {
         return type;
     }
-
     public String getRequestedPage() {
         return requestedPage;
     }
-
     public int getContentLength() {
         // Extract content length from headers and convert to integer
         try {
             return Integer.parseInt(headers.getOrDefault("Content-Length", "0"));
         } catch (NumberFormatException e) {
-            return 0; // Return default value in case of parsing error
+            return 0;
         }
     }
 

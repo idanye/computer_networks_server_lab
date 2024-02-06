@@ -68,6 +68,8 @@ class ClientHandler implements Runnable {
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             OutputStream out = clientSocket.getOutputStream();
             //System.out.println("Client ID " + clientId + " started interaction.");
+            //check that the multithreading works for the edge case where all threads are in use
+            //Thread.sleep(20*1000);
             try {
                 // Parsing the incoming request using HTTPRequest
                 HTTPRequest request = new HTTPRequest(in);
@@ -149,15 +151,26 @@ class ClientHandler implements Runnable {
     private void handlePostRequest(HTTPRequest request, OutputStream out) throws IOException {
         System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
         System.out.println("Content-length: " + request.getContentLength());
-        // Use the parsed parameters from HTTPRequest
+        // the post fata is the parameters from HTTPRequest
         Map<String, String> postData = request.getParameters();
 
         // For debugging: Print each parameter and its value
         postData.forEach((key, value) -> System.out.println(key + ": " + value));
 
         // Respond back to the client
-        String responseMessage = "Received POST Data: " + postData.toString();
-        sendSuccessResponse(out, "text/plain", responseMessage.getBytes());
+        String responseMessage = "<!DOCTYPE html>"
+                + "<html><center><head><title>POST Data Received</title>"
+                + "<style>"
+                + "  body { font-family: Arial, sans-serif; margin: 20px; background-color: #ADD8E6; }"
+                + "  h1 { color: #333366; }"
+                + "  p { color: #666666; }"
+                + "</style>"
+                + "</head>"
+                + "<body>"
+                + "<h1>Received POST Data</h1>"
+                + "<p>" + postData.toString() + "</p>"
+                + "</body></center></html>";
+        sendSuccessResponse(out, "text/html", responseMessage.getBytes());
     }
 
 
@@ -224,9 +237,9 @@ class ClientHandler implements Runnable {
         } else if (fileName.matches(".*\\.(jpg|jpeg|png|gif|bmp)$")) {
             return "image/" + getExtension(fileName);
         } else if (fileName.endsWith(".ico")) {
-            return "image/x-icon";
+            return "icon";
         } else {
-            return "application/octet-stream"; // default for other file types
+            return "application/octet-stream"; // all other file types
         }
     }
 
