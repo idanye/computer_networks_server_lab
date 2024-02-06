@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -16,18 +17,18 @@ public class MultiThreadedServer {
         try {
             ServerConfig.init("config.ini");
         } catch (Exception e) {
-            System.out.println("failed reading config file (" + e + ")");
+            System.out.println("Failed reading config file: " + e.getMessage());
             return;
         }
 
-        try (ServerSocket serverSocket = new ServerSocket(ServerConfig.instance.getPort())) {
-            System.out.println("Server is listening on port " + ServerConfig.instance.getPort());
-            System.out.println("rootDirectory: " + ServerConfig.instance.getRootDirectory());
+        try (ServerSocket serverSocket = new ServerSocket(ServerConfig.getInstance().getPort())) {
+            System.out.println("Server is listening on port " + ServerConfig.getInstance().getPort());
+            System.out.println("rootDirectory: " + ServerConfig.getInstance().getRootDirectory());
             // limiting the number of threads
-            ExecutorService threadPool = Executors.newFixedThreadPool(ServerConfig.instance.getMaxThreads());
+            ExecutorService threadPool = Executors.newFixedThreadPool(ServerConfig.getInstance().getMaxThreads());
 
             while (true) {
-                if (activeConnections.get() >= ServerConfig.instance.getMaxThreads()) {
+                if (activeConnections.get() >= ServerConfig.getInstance().getMaxThreads()) {
                     System.out.println("Connection limit exceeded. Denying new connections.");
                     // Optionally, you might want to sleep for a bit here to prevent a tight loop
                     try {
@@ -111,14 +112,24 @@ class ClientHandler implements Runnable {
         String homeDirectory = System.getProperty("user.home");
         //System.out.println("Current home directory: "+ homeDirectory);
         String correctedRootDirectory = ServerConfig.instance.getRootDirectory().replaceFirst("^~", homeDirectory);
-
         String requestedFile = request.getRequestedPage().equals("/") ? ServerConfig.instance.getDefaultPage() : request.getRequestedPage();
-        Path filePath = Paths.get(correctedRootDirectory, requestedFile);
+
+        // Normalize the requested path to avoid path traversal vulnerabilities.
+        Path requestPath = Paths.get(correctedRootDirectory).resolve(requestedFile).normalize();
+
+        // Path filePath = Paths.get(correctedRootDirectory, requestedFile);
+
+        // Security check: Ensure the requested path does not lead outside the intended directory
+        if (!requestPath.startsWith(Paths.get(correctedRootDirectory))) {
+            System.out.println("Security violation: " + requestPath);
+            sendErrorResponse(out, 403, "Forbidden");
+            return;
+        }
 
         System.out.println("Request:\n" + request.getType() + " " + request.getRequestedPage() + " HTTP/1.1" + "\r\n");
 
-        if (!Files.exists(filePath)) {
-            System.out.println("File not found: " + filePath);
+        if (!Files.exists(requestPath) || Files.isDirectory(requestPath)) {
+            System.out.println("File not found: " + requestPath);
             sendErrorResponse(out, 404, "404 Not Found");
             return;
         }
@@ -129,8 +140,8 @@ class ClientHandler implements Runnable {
             return;
         }
 
-        String contentType = determineContentType(filePath);
-        byte[] fileContent = Files.readAllBytes(filePath);
+        String contentType = determineContentType(requestPath);
+        byte[] fileContent = Files.readAllBytes(requestPath);
         sendSuccessResponse(out, contentType, fileContent);
     }
 
@@ -198,10 +209,10 @@ class ClientHandler implements Runnable {
     }
 
     private void sendSuccessResponse(OutputStream out, String contentType, byte[] content) throws IOException {
-        out.write("HTTP/1.1 200 OK\r\n".getBytes());
-        out.write(Util.StringToBytes("Content-Type: " + contentType + "\r\n"));
-        out.write(Util.StringToBytes("Content-Length: " + content.length + "\r\n"));
-        out.write(Util.StringToBytes("\r\n"));
+        out.write("HTTP/1.1 200 OK\r\n".getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Type: " + contentType + "\r\n").getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Length: " + content.length + "\r\n").getBytes(StandardCharsets.UTF_8));
+        out.write(("\r\n").getBytes(StandardCharsets.UTF_8));;
         out.write(content);
         out.flush();
     }

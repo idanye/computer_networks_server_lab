@@ -81,7 +81,7 @@ public class HTTPRequest {
         String[] parts = line.split(" ");
 
         if (parts.length != 3) {
-            throw new BadRequestException();
+            throw new BadRequestException("Bad request details");
         }
         
         this.type = parts[0];
@@ -89,7 +89,7 @@ public class HTTPRequest {
         String[] pathAndQuery = parts[1].split("\\?");
         this.requestedPage = pathAndQuery[0];
         if (!isLegalPageRequest(requestedPage)) {
-            throw new BadRequestException();
+            throw new BadRequestException("Bad request details");
         }
         // Parse query string for GET requests
         if ("GET".equalsIgnoreCase(this.type) && pathAndQuery.length > 1) {
@@ -114,7 +114,7 @@ public class HTTPRequest {
             String[] keyValue = pair.split("=");
             
             if (keyValue.length != 2) {
-                throw new BadRequestException();
+                throw new BadRequestException("Bad request details");
             }
 
             this.parameters.put(keyValue[0], keyValue[1]); // Consider URL decoding
@@ -125,7 +125,7 @@ public class HTTPRequest {
         // Example Header-Line: "Referer: http://example.com/"
         String[] parts = line.split(": ");
         if (parts.length != 2) {
-            throw new BadRequestException();
+            throw new BadRequestException("Bad request details");
         }
         headers.put(parts[0].trim(), parts[1].trim());
     }

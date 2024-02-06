@@ -14,7 +14,7 @@ public class ServerConfig {
         instance = new ServerConfig(configFilePath);
     } 
 
-    public ServerConfig(String configFilePath) throws Exception{
+    private ServerConfig(String configFilePath) throws Exception{
         Properties prop = new Properties();
         prop.load(new FileInputStream(configFilePath));
 
@@ -42,4 +42,11 @@ public class ServerConfig {
     public String getRootDirectory() { return rootDirectory; }
     public String getDefaultPage() { return defaultPage; }
     public int getMaxThreads() { return maxThreads; }
+
+    public static ServerConfig getInstance() {
+        if (instance == null) {
+            throw new IllegalStateException("ServerConfig has not been initialized. Call init first.");
+        }
+        return instance;
+    }
 }
