@@ -14,7 +14,7 @@ public class MultiThreadedServer {
     public static AtomicInteger activeConnections = new AtomicInteger(0);
     public static void main(String[] args) {
         try {
-            ServerConfig.init("config.ini");
+            ServerConfig.init("../config.ini");
         } catch (Exception e) {
             System.out.println("failed reading config file (" + e + ")");
             return;
@@ -177,11 +177,9 @@ class ClientHandler implements Runnable {
         // the received request line
         Util.writeToByteStreamAndLog(out, "TRACE " + request.getRequestedPage() + " HTTP/1.1\r\n");
         // return all the headers of the received request
-        //System.out.println(request.getHeaders().entrySet());
         for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
             Util.writeToByteStreamAndLog(out, header.getKey() + ": " + header.getValue() + "\r\n");
         }
-        //out.write(Util.StringToBytes("\r\n"));
         out.flush();
     }
 

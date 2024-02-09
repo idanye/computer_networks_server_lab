@@ -35,8 +35,10 @@ public class HTTPRequest {
 
         readBody(reader);
     }
-    private void logMessage(String message) {
-        Util.logBuilder.append(message).append("\n");
+    public void logMessage(String message) {
+        synchronized (Util.lock) {
+            Util.logBuilder.append(message).append("\n");
+        }
     }
     private void readBody(BufferedReader reader) throws IOException, BadRequestException {
         // Parse Content-Length
@@ -124,7 +126,6 @@ public class HTTPRequest {
                 return false;
             }
         }
-
         return true;
     }
 

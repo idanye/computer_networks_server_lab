@@ -4,7 +4,6 @@ import java.nio.file.Paths;
 
 public class ServerConfig {
     public static ServerConfig instance;
-
     private int port;
     private String rootDirectory;
     private String defaultPage;

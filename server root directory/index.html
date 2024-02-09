@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Lab Computer Networks</title>
+<style>
+    .image {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .image img {
+        width: 800px; 
+        height: 800px;
+        object-fit: cover;
+        
+    }
+    a {
+        font-size: 25px;
+    }           
+</style>
+</head>
+<body>
+<!-- 1. The moving title in blue color: Computer networks 2023: Exercise 1 -->
+<marquee direction="right" behavior="alternate"><h1><FONT COLOR=blue>Computer Networks Final Lab Project</FONT></h1></marquee>
+<!-- 2. A fixed title in red color with your full names. -->
+<center><h2><FONT COLOR=red>Our names: Tomer Juster and Idan Yehiel</FONT></h2></center>
+<!-- 3. Two images centered, side by side, at the middle of the page (You may
+choose whatever picture you want.)-->
+<div class="image">
+    <img src="picture1.png" alt="Carina Nebula by James Webb telescope">
+    <img src="picture2.png" alt="i asked Dall-E to draw me how Nebula looks like">
+</div>
+<br><br>
+<!-- 4. A link to the course website.-->
+<a href="https://moodle.runi.ac.il/2024/course/view.php?id=2401572">Computer Networks Course Website</a>
+<br>
+<!-- 5. Another link to your favorite website.-->
+<a href="https://www.gadgety.co.il/">Our favorite website</a>
+<!-- 6. A horizontal line.-->
+<hr style="height: 5px; color:#000000; background-color:#000000;">
+<!-- 7. An HTML Form containing: Sender, Receiver, Subject, Message Field,
+and Submit bottom.-->
+<center>
+    <h2>Submit Your Details</h2>
+    <form action="params_info.html" method="POST">
+        <label for="textarea">Textarea:</label><br>
+        <textarea id="textarea" name="textarea" rows="4" cols="50"></textarea><br><br>
+
+        <label for="checkbox">Checkbox:</label>
+        <input type="checkbox" id="checkbox" name="checkbox" value="Yes"><br><br>
+
+        <input type="submit" value="Submit">
+    </form>
+</center>
+
+</body>
+</html>

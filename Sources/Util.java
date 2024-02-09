@@ -8,7 +8,7 @@ public class Util {
   public static byte[] StringToBytes(String s) {
     return s.getBytes(StandardCharsets.UTF_8);
   }
-    private static final Object lock = new Object();
+    static final Object lock = new Object();
     static StringBuilder logBuilder = new StringBuilder();
 
     public static void writeToByteStreamAndLog(OutputStream out, String s) throws IOException {
@@ -19,18 +19,12 @@ public class Util {
         }
     }
 
-    // Call this method at the end of the thread's execution or in a finally block
     public static void flushLog() {
         synchronized (lock) {
             System.out.print(logBuilder.toString());
             logBuilder.setLength(0);
         }
     }
-
-    //public static void writeToByteStreamAndLog(OutputStream out, String s) throws IOException{
-    //out.write(StringToBytes(s));
-    //System.out.print("< " + s);
-  //}
 
   public static byte[] charArrayToBytes(char[] chars) {
     byte[] bytes = new byte[chars.length];
