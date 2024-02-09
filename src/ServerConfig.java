@@ -14,7 +14,7 @@ public class ServerConfig {
         instance = new ServerConfig(configFilePath);
     } 
 
-    private ServerConfig(String configFilePath) throws Exception{
+    public ServerConfig(String configFilePath) throws Exception{
         Properties prop = new Properties();
         prop.load(new FileInputStream(configFilePath));
 
@@ -27,7 +27,7 @@ public class ServerConfig {
     private String resolveRootDirectory(String configRootPath) {
         if (configRootPath.startsWith("~")) {
             String homeDirectory = System.getProperty("user.home");
-            // adding a separator between the home directory and the path
+            // adding a separator    between the home directory and the path
             configRootPath = homeDirectory + File.separator + configRootPath.substring(1);
         }
         // we used normalize to ensure it's correct for multiple OS.
@@ -38,11 +38,4 @@ public class ServerConfig {
     public String getRootDirectory() { return rootDirectory; }
     public String getDefaultPage() { return defaultPage; }
     public int getMaxThreads() { return maxThreads; }
-
-    public static ServerConfig getInstance() {
-        if (instance == null) {
-            throw new IllegalStateException("ServerConfig has not been initialized. Call init first.");
-        }
-        return instance;
-    }
 }
