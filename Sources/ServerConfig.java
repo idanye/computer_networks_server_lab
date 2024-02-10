@@ -18,21 +18,20 @@ public class ServerConfig {
         prop.load(new FileInputStream(configFilePath));
 
         port = Integer.parseInt(prop.getProperty("port"));
-        rootDirectory = resolveRootDirectory(prop.getProperty("root"));
+        rootDirectory = getRootDirectory(prop.getProperty("root"));
         defaultPage = prop.getProperty("defaultPage");
         maxThreads = Integer.parseInt(prop.getProperty("maxThreads"));
     }
 
-    private String resolveRootDirectory(String configRootPath) {
+    private String getRootDirectory(String configRootPath) {
         if (configRootPath.startsWith("~")) {
             String homeDirectory = System.getProperty("user.home");
-            // adding a separator    between the home directory and the path
+            // adding a separator between the home directory and the path
             configRootPath = homeDirectory + File.separator + configRootPath.substring(1);
         }
         // we used normalize to ensure it's correct for multiple OS.
         return Paths.get(configRootPath).normalize().toString();
     }
-
     public int getPort() { return port; }
     public String getRootDirectory() { return rootDirectory; }
     public String getDefaultPage() { return defaultPage; }

@@ -100,7 +100,7 @@ class ClientHandler implements Runnable {
         } finally {
             try {
                 //System.out.println("Client ID " + clientId + " completed interaction.");
-                Util.flushLog();
+                Util.printLogsToServer();
                 clientSocket.close();
             } catch (IOException ex) {
                 System.out.println("Error closing connection for client ID " + clientId + ": " + ex.getMessage());

@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 
 public class HTTPRequest {
@@ -108,25 +109,26 @@ public class HTTPRequest {
         this.method = parts[0];
         // Split the requested page and query string
         String[] pathAndQuery = parts[1].split("\\?");
-        this.requestedPage = pathAndQuery[0];
-        if (!isLegalPageRequest(requestedPage)) {
-            throw new BadRequestException();
-        }
-        // Parse query string for GET requests
+        this.requestedPage = isRequestGoingOutsideRoot(pathAndQuery[0]) ;
+
+        // Parse query string for GET request
         if (pathAndQuery.length > 1) {
             this.parameters = Util.parseQueryString(pathAndQuery[1]);
         }
     }
 
-    //check that we don't go out of the root
-    private boolean isLegalPageRequest(String path) {
+    //check that we don't go out of the root. if we found .. we just ignore it and remove it from the path
+    private String isRequestGoingOutsideRoot(String path) {
         String[] parts = path.split("[/\\\\]");
+        LinkedList<String> newPath = new LinkedList<>();
         for (String part : parts) {
-            if (part.equals("..")) {
-                return false;
+            if (part.equals("..") && !newPath.isEmpty()) {
+                newPath.pollLast();
+            } else {
+                newPath.add(part);
             }
         }
-        return true;
+        return "/" + String.join("/", newPath);
     }
 
     private void parseHeaderLine(String line) throws BadRequestException {

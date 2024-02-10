@@ -19,7 +19,7 @@ public class Util {
         }
     }
 
-    public static void flushLog() {
+    public static void printLogsToServer() {
         synchronized (lock) {
             System.out.print(logBuilder.toString());
             logBuilder.setLength(0);
