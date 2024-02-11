@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MultiThreadedServer {
@@ -26,7 +25,6 @@ public class MultiThreadedServer {
             System.out.println("rootDirectory: " + ServerConfig.instance.getRootDirectory());
             // limiting the number of threads to maxThreads from config.ini
             ExecutorService threadPool = Executors.newFixedThreadPool(ServerConfig.instance.getMaxThreads());
-            Semaphore semaphore = new Semaphore(ServerConfig.instance.getMaxThreads());
             try {
                 while (true) {
                     if (activeConnections.get() >= ServerConfig.instance.getMaxThreads()) {
@@ -71,7 +69,7 @@ class ClientHandler implements Runnable {
             //debugging:
             //System.out.println("Client ID " + clientId + " started interaction.");
             try {
-                // Parsing the incoming request using HTTPRequest
+                // Parsing the request using HTTPRequest
                 HTTPRequest request = new HTTPRequest(log, in);
                 switch (request.getMethod()) {
                     case "GET":
@@ -97,7 +95,7 @@ class ClientHandler implements Runnable {
             System.out.println("Error handling client ID " + clientId + ": " + e);
         } finally {
             try {
-                //System.out.println("Client ID " + clientId + " completed interaction.");
+                //System.out.println("Client ID " + clientId + " not connected anymore");
                 Util.printLogsToServer(log);
                 clientSocket.close();
             } catch (IOException ex) {
@@ -140,16 +138,17 @@ class ClientHandler implements Runnable {
         Map<String, String> urlParams = request.getParameters();
 
         String contentType = request.getHeaders().get("content-type");
+        int contentLen = request.getContentLength();
         if (contentType == null || !contentType.equalsIgnoreCase("application/x-www-form-urlencoded")) {
-            if (request.getBody().length > 0) {
+            if (request.getBody().length > 0 && contentLen == 0) {
                 throw new BadRequestException();
             }
         }
 
-        Map<String, String> bodyParams = Util.parseQueryString(new String(request.getBody()));
+        Map<String, String> bodyParams = Util.parseParameters(new String(request.getBody()));
 
         // For debugging: Print each parameter and its value
-        urlParams.forEach((key, value) -> System.out.println(key + ": " + value));
+        //urlParams.forEach((key, value) -> System.out.println(key + ": " + value));
 
         // Respond back to the client
         String responseMessage = "<!DOCTYPE html>"
@@ -210,7 +209,8 @@ class ClientHandler implements Runnable {
     private void sendSuccessResponse(HTTPRequest request, OutputStream out, String contentType, byte[] content) throws IOException {
         //Util.writeToByteStreamAndLog(out, "Content-Type: " + contentType + "\r\n");
         if (request.getHeaders().getOrDefault("chunked", "").equals("yes")) {
-            Util.writeToByteStreamAndLog(log, out, "HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\n");
+            Util.writeToByteStreamAndLog(log, out, "HTTP/1.1 200 OK\r\n");
+            Util.writeToByteStreamAndLog(log, out,"Content-Type: " + contentType + "\r\n");
             Util.writeToByteStreamAndLog(log, out, "Transfer-Encoding: chunked\r\n");
             out.write(Util.StringToBytes("\r\n"));
             writeChunkedResponse(out, content);
@@ -246,12 +246,12 @@ class ClientHandler implements Runnable {
     }
 
     private String determineContentType(Path filePath) {
-        String fileName = filePath.toString().toLowerCase();
-        if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
+        String path = filePath.toString().toLowerCase();
+        if (path.endsWith(".html") || path.endsWith(".htm")) {
             return "text/html";
-        } else if (fileName.matches(".*\\.(jpg|jpeg|png|gif|bmp)$")) {
-            return "image/" + getExtension(fileName);
-        } else if (fileName.endsWith(".ico")) {
+        } else if (path.matches(".*\\.(jpg|jpeg|png|gif|bmp)$")) {
+            return "image/" + getExtension(path);
+        } else if (path.endsWith(".ico")) {
             return "icon";
         } else {
             return "application/octet-stream"; // all other file types

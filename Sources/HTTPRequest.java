@@ -111,7 +111,7 @@ public class HTTPRequest {
 
         // Parse query string for GET request
         if (pathAndQuery.length > 1) {
-            this.parameters = Util.parseQueryString(pathAndQuery[1]);
+            this.parameters = Util.parseParameters(pathAndQuery[1]);
         }
     }
 

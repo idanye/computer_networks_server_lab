@@ -30,7 +30,7 @@ public class Util {
     return bytes;
   } 
 
-  public static Map<String, String> parseQueryString(String queryString) throws BadRequestException {
+  public static Map<String, String> parseParameters(String queryString) throws BadRequestException {
     Map<String, String> params = new HashMap<String, String>();
     String[] pairs = queryString.split("&");
     for (String pair : pairs) {
