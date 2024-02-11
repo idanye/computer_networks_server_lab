@@ -13,7 +13,7 @@ public class HTTPRequest {
     private Map<String, String> parameters;
 
     //Constructor
-    public HTTPRequest(BufferedReader reader) throws IOException, BadRequestException {
+    public HTTPRequest(StringBuilder log, BufferedReader reader) throws IOException, BadRequestException {
         this.method = "";
         this.requestedPage = "";
         this.headers = new HashMap<>();
@@ -25,22 +25,20 @@ public class HTTPRequest {
         if (line == null) {
             throw new BadRequestException();
         }
-        logMessage("> " + line);
+        //logMessage("> " + line);
         parseRequestLine(line);
-
+        log.append("> " + line);
+        log.append("\n");
         // read the rest of the headers
         while ((line = reader.readLine()) != null && !line.isEmpty()) {
-            logMessage("> " + line);
+            //logMessage("> " + line);
+            log.append("> " + line).append("\n");
             parseHeaderLine(line);
         }
-
+        
         readBody(reader);
     }
-    public void logMessage(String message) {
-        synchronized (Util.lock) {
-            Util.logBuilder.append(message).append("\n");
-        }
-    }
+    
     private void readBody(BufferedReader reader) throws IOException, BadRequestException {
         // Parse Content-Length
         int contentLength = 0;
@@ -99,7 +97,7 @@ public class HTTPRequest {
     }
 
     private void parseRequestLine(String line) throws BadRequestException {
-        //example: GET /index.html HTTP/1.1 > we split to 3 parts
+        //we need to split to 3 parts
         String[] parts = line.split(" ");
 
         if (parts.length != 3) {
@@ -147,7 +145,6 @@ public class HTTPRequest {
         return requestedPage;
     }
     public int getContentLength() {
-        // Extract content length from headers and convert to integer
         try {
             return Integer.parseInt(headers.getOrDefault("content-length", "0"));
         } catch (NumberFormatException e) {

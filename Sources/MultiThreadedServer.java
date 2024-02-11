@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MultiThreadedServer {
@@ -25,24 +26,19 @@ public class MultiThreadedServer {
             System.out.println("rootDirectory: " + ServerConfig.instance.getRootDirectory());
             // limiting the number of threads to maxThreads from config.ini
             ExecutorService threadPool = Executors.newFixedThreadPool(ServerConfig.instance.getMaxThreads());
+            Semaphore semaphore = new Semaphore(ServerConfig.instance.getMaxThreads());
             try {
                 while (true) {
                     if (activeConnections.get() >= ServerConfig.instance.getMaxThreads()) {
                         System.out.println("Connection limit exceeded. Denying new connections.");
-                        try {
-                            //put him to sleep for 1 seconds
-                            Thread.sleep(100);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
-                        continue;
+
                     }
-    
+
                     Socket clientSocket = serverSocket.accept();
                     int clientId = activeConnections.getAndIncrement();
                     //for debugging:
                     //System.out.println("Client connected. Current clients: " + activeConnections.get() + ". Client ID: " + clientId);
-                    threadPool.execute(new ClientHandler(clientSocket, clientId));     
+                    threadPool.execute(new ClientHandler(clientSocket, clientId));
                 }
             } finally {
                 threadPool.shutdown();
@@ -57,12 +53,14 @@ public class MultiThreadedServer {
 class ClientHandler implements Runnable {
     private Socket clientSocket;
     private int clientId;
+    private StringBuilder log;
 
     public static int CHUNK_SIZE = 16;
 
     public ClientHandler(Socket socket, int clientId) {
         this.clientSocket = socket;
         this.clientId = clientId;
+        this.log = new StringBuilder();
     }
 
     @Override
@@ -74,7 +72,7 @@ class ClientHandler implements Runnable {
             //System.out.println("Client ID " + clientId + " started interaction.");
             try {
                 // Parsing the incoming request using HTTPRequest
-                HTTPRequest request = new HTTPRequest(in);
+                HTTPRequest request = new HTTPRequest(log, in);
                 switch (request.getMethod()) {
                     case "GET":
                         handleGetOrHeadRequest(request, out, false);
@@ -100,7 +98,7 @@ class ClientHandler implements Runnable {
         } finally {
             try {
                 //System.out.println("Client ID " + clientId + " completed interaction.");
-                Util.printLogsToServer();
+                Util.printLogsToServer(log);
                 clientSocket.close();
             } catch (IOException ex) {
                 System.out.println("Error closing connection for client ID " + clientId + ": " + ex.getMessage());
@@ -128,9 +126,9 @@ class ClientHandler implements Runnable {
 
         String contentType = determineContentType(filePath);
         if (isHead){
-            Util.writeToByteStreamAndLog(out, "HTTP/1.1 200 OK\r\n");
-            Util.writeToByteStreamAndLog(out, "Content-Type: " + contentType + "\r\n");
-            Util.writeToByteStreamAndLog(out, "Content-Length: " + Files.size(filePath) + "\r\n");
+            Util.writeToByteStreamAndLog(log, out, "HTTP/1.1 200 OK\r\n");
+            Util.writeToByteStreamAndLog(log, out, "Content-Type: " + contentType + "\r\n");
+            Util.writeToByteStreamAndLog(log, out, "Content-Length: " + Files.size(filePath) + "\r\n");
             out.write(Util.StringToBytes("\r\n")); // No body is sent for HEAD request
         }else {
             byte[] fileContent = Files.readAllBytes(filePath);
@@ -163,45 +161,63 @@ class ClientHandler implements Runnable {
                 + "</style>"
                 + "</head>"
                 + "<body>"
-                + "<h1>Received POST Data</h1>"
+                + "<h1>Received POST Data and wrote it to params_info.html</h1>"
                 + "<p> url params: " + urlParams.toString() + "</p>"
                 + "<p> body params: " + bodyParams.toString() + "</p>"
                 + "</body></center></html>";
-        sendSuccessResponse(request, out, "text/html", responseMessage.getBytes());
+        try{
+            String paramsInfo = ServerConfig.instance.getRootDirectory() + "/params_info.html";
+            //System.out.println(paramsInfo);
+            writeToParamsInfo(paramsInfo, responseMessage);
+        } finally {
+            sendSuccessResponse(request, out, "text/html", responseMessage.getBytes());
+        }
+
+    }
+
+    private void writeToParamsInfo(String path,String responseMessage) {
+        // Overwrite the file with new content
+        try (FileWriter writer = new FileWriter(path, false)) {
+            writer.write(responseMessage);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void handleTraceRequest(HTTPRequest request, OutputStream out) throws IOException {
-        Util.writeToByteStreamAndLog(out, "HTTP/1.1 200 OK\r\n");
-        Util.writeToByteStreamAndLog(out, "Content-Type: message/http\r\n");
+        Util.writeToByteStreamAndLog(log, out, "HTTP/1.1 200 OK\r\n");
+        Util.writeToByteStreamAndLog(log, out, "Content-Type: message/http\r\n");
         out.write(Util.StringToBytes("\r\n"));
         // the received request line
-        Util.writeToByteStreamAndLog(out, "TRACE " + request.getRequestedPage() + " HTTP/1.1\r\n");
+        Util.writeToByteStreamAndLog(log, out, "TRACE " + request.getRequestedPage() + " HTTP/1.1\r\n");
         // return all the headers of the received request
         for (Map.Entry<String, String> header : request.getHeaders().entrySet()) {
-            Util.writeToByteStreamAndLog(out, header.getKey() + ": " + header.getValue() + "\r\n");
+            Util.writeToByteStreamAndLog(log, out, header.getKey() + ": " + header.getValue() + "\r\n");
         }
         out.flush();
     }
 
     private void sendErrorResponse(OutputStream out, int statusCode, String statusMessage) throws IOException {
-        Util.writeToByteStreamAndLog(out, "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n");
-        Util.writeToByteStreamAndLog(out, "Content-Type: text/html\r\n");
+        Util.writeToByteStreamAndLog(log, out, "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n");
+        Util.writeToByteStreamAndLog(log, out, "Content-Type: text/html\r\n");
         byte[] body = Util.StringToBytes("<html><body><h1>" + statusMessage + "</h1></body></html>\r\n");
-        Util.writeToByteStreamAndLog(out, "Content-Length: " + body.length + "\r\n");
+        Util.writeToByteStreamAndLog(log, out, "Content-Length: " + body.length + "\r\n");
         out.write(Util.StringToBytes("\r\n"));
         out.write(body);
         out.flush();
     }
 
     private void sendSuccessResponse(HTTPRequest request, OutputStream out, String contentType, byte[] content) throws IOException {
-        Util.writeToByteStreamAndLog(out, "HTTP/1.1 200 OK\r\n");
-        Util.writeToByteStreamAndLog(out, "Content-Type: " + contentType + "\r\n");
+        //Util.writeToByteStreamAndLog(out, "Content-Type: " + contentType + "\r\n");
         if (request.getHeaders().getOrDefault("chunked", "").equals("yes")) {
-            Util.writeToByteStreamAndLog(out, "Transfer-Encoding: chunked\r\n");
+            Util.writeToByteStreamAndLog(log, out, "HTTP/1.1 200 OK\r\nContent-Type: " + contentType + "\r\n");
+            Util.writeToByteStreamAndLog(log, out, "Transfer-Encoding: chunked\r\n");
             out.write(Util.StringToBytes("\r\n"));
             writeChunkedResponse(out, content);
         } else {
-            Util.writeToByteStreamAndLog(out, "Content-Length: " + content.length + "\r\n");
+            Util.writeToByteStreamAndLog(log, out, "HTTP/1.1 200 OK\r\n");
+            Util.writeToByteStreamAndLog(log, out, "Content-Type: " + contentType + "\r\n");
+            Util.writeToByteStreamAndLog(log, out, "Content-Length: " + content.length + "\r\n");
             out.write(Util.StringToBytes("\r\n"));
             out.write(content);
         }
