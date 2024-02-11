@@ -29,7 +29,7 @@ public class ServerConfig {
             // adding a separator between the home directory and the path
             configRootPath = homeDirectory + File.separator + configRootPath.substring(1);
         }
-        // we used normalize to ensure it's correct for multiple OS.
+        // we used normalize to ensure it's works for multiple OS like windows and linux.
         return Paths.get(configRootPath).normalize().toString();
     }
     public int getPort() { return port; }
